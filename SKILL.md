@@ -61,7 +61,7 @@ allowed-tools:
 | 国内站点，中等反爬 | `DrissionPage` | 中文文档好，API 简洁 |
 | 强反爬（Cloudflare/DataDome） | `CloakBrowser` | C++ 源码级指纹伪装 |
 | 大规模整站采集 | `Scrapy` / `Crawlee` | 内置队列、去重、反封锁 |
-| APP 抓包爬取 | 模拟器 + Charles/mitmproxy + Python 复现 | 抓 HTTPS → 逆向加密 → 复现请求 |
+| APP 抓包爬取 | MuMu 模拟器 + Reqable + Python 复现 | 抓 HTTPS → 逆向加密 → 复现请求 |
 | 字体反爬 | `fontTools` + `ddddocr` | cmap 解密 + OCR |
 | 滑块验证码 | `ddddocr.slide_match` + 动作链 | ddddocr 识别缺口位置 |
 | JS 参数加密 | `execjs` / `page.evaluate` | Python 调 JS 加密逻辑 |
@@ -204,14 +204,15 @@ class MySpider(scrapy.Spider):
 ### 阶段 10：APP 抓包爬取
 
 ```
-模拟器（MEmu/MuMu）+ Charles/mitmproxy → 分析 HTTPS 请求 → Python 复现
+MuMu 模拟器 + Reqable → 分析 HTTPS 请求 → Python 复现
 ```
 
 关键步骤：
-1. 模拟器配代理，安装 CA 证书
-2. SSL Pinning → Xposed + JustTrustMe 模块绕过
-3. 分析签名参数 → jadx 反编译 APK / Frida Hook
-4. 用 `requests` 或 `curl_cffi` 复现请求
+1. MuMu 模拟器配代理指向 Reqable（默认端口 9000）
+2. 安装 Reqable CA 证书
+3. SSL Pinning → Xposed + JustTrustMe 绕过
+4. 分析签名参数 → jadx 反编译 APK / Frida Hook
+5. 用 `requests` 或 `curl_cffi` 复现请求
 
 ---
 
