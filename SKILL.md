@@ -94,3 +94,117 @@ allowed-tools:
 ### 第8步：确认结果
 
 数据保存后告知用户：多少条数据、保存在哪、用时多少。
+
+---
+
+## 知识库速查表
+
+### 阶段 1：HTTP 请求基础 (day01-day03)
+
+| 概念 | 工具 | 代码骨架 |
+|------|------|---------|
+| GET 请求 | `requests.get()` | `requests.get(url, headers=headers, timeout=10)` |
+| POST 请求 | `requests.post()` | `requests.post(url, data=data, headers=headers)` |
+| UA 伪装 | `fake_useragent` | `UserAgent(platforms='desktop').random` |
+| Cookie 持久化 | `requests.Session()` | `session.get()` / `session.post()` |
+| URL 编码 | `urllib.parse.quote()` | `quote('中文关键词')` |
+
+### 阶段 2：数据提取 (day06-day08)
+
+| 数据类型 | 工具 | 代码骨架 |
+|---------|------|---------|
+| HTML XPath | `lxml.etree` | `tree.xpath('//ul/li/a/text()')` |
+| HTML CSS | `lxml.cssselect` | `tree.cssselect('.price')` |
+| JSON 路径 | `jsonpath` | `jsonpath(obj, '$.data[*].name')` |
+| JS 内嵌数据 | `re` | `re.findall(r'var data = (.*?);', html)` |
+
+### 阶段 3：字体反爬 (day09-day10)
+
+```python
+from fontTools.ttLib import TTFont
+font = TTFont('font.woff')          # 下载字体文件
+cmap = font.getBestCmap()           # 获取 cmap 映射表
+mapping = {chr(k): str(v) for k, v in cmap.items()}  # unicode → 真实字
+# 将页面中加密的字符按 mapping 替换
+```
+
+### 阶段 4：JS 逆向 (day11-day12)
+
+```python
+import execjs
+ctx = execjs.compile(open('encrypt.js', encoding='utf-8').read())
+encrypted = ctx.call('encrypt_function', '参数')
+```
+
+### 阶段 5-6：浏览器自动化 (day13-day16)
+
+| 操作 | Selenium | DrissionPage |
+|------|----------|--------------|
+| 启动 | `webdriver.Chrome()` | `ChromiumPage()` |
+| 无头模式 | `Options().add_argument('--headless')` | `ChromiumOptions().headless()` |
+| 元素定位 | `find_element(By.XPATH, '//div')` | `ele('xpath://div')` |
+| 点击 | `element.click()` | `ele.click()` |
+| 输入 | `element.send_keys('text')` | `ele.input('text')` |
+| iframe | `driver.switch_to.frame(el)` | 直接 `ele('tag:iframe')` |
+| 网络监听 | 不支持 | `page.listen.start()` |
+| 滑块验证码 | `ActionChains(driver).click_and_hold().move_by_offset().release()` | `page.actions.hold().move().release()` |
+
+### 阶段 7：异步并发 (day_19-day_20)
+
+```python
+import asyncio
+from aiohttp import ClientSession
+
+async def fetch(session, semaphore, url):
+    async with semaphore:
+        async with session.get(url) as resp:
+            return await resp.text()
+
+async def main(urls):
+    semaphore = asyncio.Semaphore(10)
+    async with ClientSession() as session:
+        tasks = [asyncio.create_task(fetch(session, semaphore, url)) for url in urls]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+    return [r for r in results if not isinstance(r, Exception)]
+```
+
+### 阶段 8：Playwright / CloakBrowser (day_21)
+
+| | Playwright | CloakBrowser |
+|---|-----------|-------------|
+| 同步启动 | `sync_playwright().chromium.launch()` | `launch()` |
+| 异步启动 | `async_playwright().chromium.launch()` | `launch_async()` |
+| 反检测 | 手动 `page.add_init_script()` | 源码级内置 |
+| 迁移成本 | — | 改一行 import |
+
+---
+
+## 代码生成规则
+
+生成代码时必须遵守：
+
+1. **匹配用户风格**：观察用户项目中的变量命名（如 `page_book_info`、`book_name_element`）、注释风格（中文注释说明意图）和缩进规范，保持一致
+2. **Headers 完整**：必须包含 `User-Agent`、`Accept`、`Accept-Language`、`sec-ch-ua`、`sec-fetch-*` 系列字段
+3. **CSV 编码**：统一使用 `encoding='utf-8-sig'`，确保 Excel 直接打开不乱码
+4. **异步安全**：并发代码必须带 `asyncio.Semaphore` 限流，`gather` 必须加 `return_exceptions=True`
+5. **浏览器复用**：多页并发时共享一个 browser 实例，用完 `try/finally` 关闭 page
+6. **CloakBrowser 无需反检测 JS**：指纹伪装已内置在 C++ 层，不要添加 `add_init_script`
+7. **使用 .venv 解释器**：运行爬虫代码时使用项目虚拟环境 Python 解释器
+
+---
+
+## 调试清单
+
+遇到报错按此表排查，按频率排序：
+
+| # | 典型报错 | 原因 | 修复 |
+|---|---------|------|------|
+| 1 | `ModuleNotFoundError: No module named 'xxx'` | 未安装 | `pip install xxx` |
+| 2 | `AttributeError: 'NoneType' object has no attribute 'xxx'` | XPath/CSS 写错，或页面结构变了 | F12 重新确认 selector，检查是否在 iframe 中 |
+| 3 | `Element is not an <input>, <textarea>, <select>` | `.fill()` 选中了 div 容器而非内部 input | 用 `#chat-textarea` 或 `//input[@id='kw']` 精确定位到表单元素 |
+| 4 | 列表为空 / URL 404 | 参数名与 Playwright `page` 对象同名导致 URL 拼错 | 将页码参数名改为 `page_num`，避免覆盖 |
+| 5 | `SSL: CERTIFICATE_VERIFY_FAILED` | Windows 下 Python 证书链不完整 | `pip install pip-system-certs` |
+| 6 | 三维列表 / CSV 写不进去 | `asyncio.gather()` 返回结果多包了一层 | `[item for page in all_pages for item in page]` 扁平化 |
+| 7 | CSV 用 Excel 打开中文乱码 | 默认写入 gbk 编码 | 加 `encoding='utf-8-sig'` |
+| 8 | 一个 task 报错导致全部数据丢失 | `gather()` 默认抛异常 | 加 `return_exceptions=True`，然后用 `isinstance(result, Exception)` 过滤 |
+
