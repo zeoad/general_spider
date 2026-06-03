@@ -61,6 +61,7 @@ allowed-tools:
 | 国内站点，中等反爬 | `DrissionPage` | 中文文档好，API 简洁 |
 | 强反爬（Cloudflare/DataDome） | `CloakBrowser` | C++ 源码级指纹伪装 |
 | 大规模整站采集 | `Scrapy` / `Crawlee` | 内置队列、去重、反封锁 |
+| APP 抓包爬取 | 模拟器 + Charles/mitmproxy + Python 复现 | 抓 HTTPS → 逆向加密 → 复现请求 |
 | 字体反爬 | `fontTools` + `ddddocr` | cmap 解密 + OCR |
 | 滑块验证码 | `ddddocr.slide_match` + 动作链 | ddddocr 识别缺口位置 |
 | JS 参数加密 | `execjs` / `page.evaluate` | Python 调 JS 加密逻辑 |
@@ -176,6 +177,41 @@ async def main(urls):
 | 异步启动 | `async_playwright().chromium.launch()` | `launch_async()` |
 | 反检测 | 手动 `page.add_init_script()` | 源码级内置 |
 | 迁移成本 | — | 改一行 import |
+
+### 阶段 9：Scrapy 大规模采集
+
+```python
+import scrapy
+
+class MySpider(scrapy.Spider):
+    name = "example"
+    start_urls = ["https://example.com"]
+
+    def parse(self, response):
+        for item in response.css(".item"):
+            yield {
+                "title": item.css("h2::text").get(),
+                "price": item.css(".price::text").get(),
+            }
+        # 自动翻页
+        next_page = response.css(".next a::attr(href)").get()
+        if next_page:
+            yield response.follow(next_page, self.parse)
+```
+
+关键配置：`CONCURRENT_REQUESTS = 16`、`DOWNLOAD_DELAY = 1`、`AUTOTHROTTLE_ENABLED = True`。
+
+### 阶段 10：APP 抓包爬取
+
+```
+模拟器（MEmu/MuMu）+ Charles/mitmproxy → 分析 HTTPS 请求 → Python 复现
+```
+
+关键步骤：
+1. 模拟器配代理，安装 CA 证书
+2. SSL Pinning → Xposed + JustTrustMe 模块绕过
+3. 分析签名参数 → jadx 反编译 APK / Frida Hook
+4. 用 `requests` 或 `curl_cffi` 复现请求
 
 ---
 
